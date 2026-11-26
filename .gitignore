@@ -1,0 +1,4 @@
+/.vscode
+/enrich_network_images.py
+/spotify_network_crawling_v2.py
+/__pycache__

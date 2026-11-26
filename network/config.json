@@ -1,0 +1,53 @@
+{
+  "type": "network",
+  "version": "1.0",
+  "data": "data.json",
+  "logo": {
+    "file": "",
+    "link": "",
+    "text": "Imre Kovacs"
+  },
+  "text": {
+    "more": "Spotify móricka project",
+    "intro": "Spotify móricka project",
+    "title": ""
+  },
+  "legend": {
+    "edgeLabel": "Fans also like",
+    "colorLabel": "Modularity",
+    "nodeLabel": "Artists"
+  },
+  "features": {
+    "search": true,
+    "groupSelectorAttribute": false,
+    "hoverBehavior": "default"
+  },
+  "informationPanel": {
+    "groupByEdgeDirection": false,
+    "imageAttribute": "image"
+  },
+  "sigma": {
+    "drawingProperties": {
+      "defaultEdgeType": "curve",
+      "defaultHoverLabelBGColor": "#002147",
+      "defaultLabelBGColor": "#ddd",
+      "activeFontStyle": "bold",
+      "defaultLabelColor": "#000",
+      "labelThreshold": 10,
+      "defaultLabelHoverColor": "#fff",
+      "fontStyle": "bold",
+      "hoverFontStyle": "bold",
+      "defaultLabelSize": 14
+    },
+    "graphProperties": {
+      "maxEdgeSize": 0.5,
+      "minEdgeSize": 0.2,
+      "minNodeSize": 2,
+      "maxNodeSize": 20
+    },
+    "mouseProperties": {
+      "maxRatio": 50,
+      "minRatio": 0.75
+    }
+  }
+}
