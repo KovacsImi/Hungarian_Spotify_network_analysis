@@ -60,7 +60,7 @@
         var hoverCtx = core.domElements.hover.getContext("2d");
         var redrawTimer = null;
         var colorMode = "image"; // "image" | "color"
-        var showLabels = true;
+        var showLabels = false;
 
         function redrawNodesNow() {
             if (!core.p || !core.p.lastNodes) return;
@@ -535,6 +535,6 @@
     };
 
     sigma.publicPrototype.getLabelsVisible = function () {
-        return this._core._labelDisplayMode ? this._core._labelDisplayMode.isVisible() : true;
+        return this._core._labelDisplayMode ? this._core._labelDisplayMode.isVisible() : false;
     };
 })();

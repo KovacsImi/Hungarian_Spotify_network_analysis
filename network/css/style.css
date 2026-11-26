@@ -364,6 +364,13 @@ canvas#sigma_bg_1 {
 #mainpanel {
 	top: 18px;
 	left: 18px;
+	max-height: calc(100vh - 36px);
+	max-width: calc(100vw - 36px);
+	box-sizing: border-box;
+	overflow-y: auto;
+	overflow-x: hidden;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 	margin: 0;
 	background: rgba(18, 20, 26, 0.93);
 	-webkit-backdrop-filter: blur(12px);
@@ -374,6 +381,23 @@ canvas#sigma_bg_1 {
 	color: #e2e8f0;
 	z-index: 20;
 	position: fixed;
+}
+
+#mainpanel::-webkit-scrollbar {
+	width: 6px;
+}
+
+#mainpanel::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+#mainpanel::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.22);
+	border-radius: 3px;
+}
+
+#mainpanel::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.35);
 }
 
 #mainpanel .b1 {
@@ -539,22 +563,17 @@ canvas#sigma_bg_1 {
 
 #attributeselect .list {
 	display: none;
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	border-radius: 12px;
-	padding: 8px;
-	height: 260px;
-	width: 300px;
+	margin-top: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 10px;
+	padding: 6px;
+	max-height: 220px;
+	width: 100%;
+	box-sizing: border-box;
 	overflow-y: auto;
 	overflow-x: hidden;
-	background: rgba(18, 20, 26, 0.96);
-	-webkit-backdrop-filter: blur(12px);
-	backdrop-filter: blur(12px);
-	box-shadow: 0 14px 36px rgba(0, 0, 0, 0.8);
-	position: absolute;
-	left: calc(100% + 14px);
-	bottom: 0;
+	background: rgba(255, 255, 255, 0.05);
 	color: #f1f5f9;
-	z-index: 30;
 }
 
 #attributeselect .list a {
