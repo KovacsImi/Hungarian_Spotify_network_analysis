@@ -88,7 +88,10 @@ function initSigma(config) {
         defaultEdgeType: "curve",
         hoverFontStyle: "bold",
         fontStyle: "bold",
-        activeFontStyle: "bold"
+        activeFontStyle: "bold",
+        edgesSpeed: 8000,
+        nodesSpeed: 2000,
+        labelsSpeed: 2000
     };
     
     if (config.sigma && config.sigma.graphProperties)	
@@ -243,6 +246,15 @@ function setupGUI(config) {
         $(this).addClass("active");
         if (sigInst && sigInst.setNodeColorMode) {
             sigInst.setNodeColorMode(mode);
+        }
+    });
+
+    $("#labelmode").find(".mode-btn").click(function () {
+        var visible = $(this).data("labels") !== "hide";
+        $("#labelmode .mode-btn").removeClass("active");
+        $(this).addClass("active");
+        if (sigInst && sigInst.setLabelsVisible) {
+            sigInst.setLabelsVisible(visible);
         }
     });
 }

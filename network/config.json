@@ -37,7 +37,10 @@
       "defaultLabelHoverColor": "#fff",
       "fontStyle": "bold",
       "hoverFontStyle": "bold",
-      "defaultLabelSize": 14
+      "defaultLabelSize": 14,
+      "edgesSpeed": 8000,
+      "nodesSpeed": 2000,
+      "labelsSpeed": 2000
     },
     "graphProperties": {
       "maxEdgeSize": 2.5,

@@ -18,6 +18,9 @@
         var dragState = null;
         var initialBounds = null;
         var currentScaleA = 1;
+        var adjacency = null;
+        var adjacencyEdgeCount = -1;
+        var pendingDragRaf = null;
 
         var origRescale = graph.rescale;
 
@@ -117,18 +120,39 @@
             return null;
         }
 
+        function getAdjacentEdges(node) {
+            var edges = graph.edges;
+            if (!adjacency || adjacencyEdgeCount !== edges.length) {
+                adjacency = {};
+                adjacencyEdgeCount = edges.length;
+                for (var i = 0; i < edges.length; i++) {
+                    var e = edges[i];
+                    var sid = e.source && e.source.id;
+                    var tid = e.target && e.target.id;
+                    if (sid !== undefined) {
+                        (adjacency[sid] || (adjacency[sid] = [])).push(e);
+                    }
+                    if (tid !== undefined && tid !== sid) {
+                        (adjacency[tid] || (adjacency[tid] = [])).push(e);
+                    }
+                }
+            }
+            return adjacency[node.id] || [];
+        }
+
         function drawDragPreview(node) {
             nodeCtx.clearRect(0, 0, nodeDom.width, nodeDom.height);
             labelCtx.clearRect(0, 0, labelDom.width, labelDom.height);
             hoverCtx.clearRect(0, 0, hoverDom.width, hoverDom.height);
 
-            // Draw live moving edges attached to the dragged node on the hover layer
-            var edges = graph.edges;
+            // Draw only edges adjacent to the dragged node via cached adjacency lookup
+            var edges = getAdjacentEdges(node);
+            var ratio = core.mousecaptor && core.mousecaptor.ratio ? core.mousecaptor.ratio : 1;
+            var allowCurve = ratio >= 1.8;
             hoverCtx.save();
             for (var i = 0; i < edges.length; i++) {
                 var e = edges[i];
                 if (e.hidden || e.source.hidden || e.target.hidden) continue;
-                if (e.source !== node && e.target !== node) continue;
 
                 var sx = e.source.displayX;
                 var sy = e.source.displayY;
@@ -146,7 +170,7 @@
                 hoverCtx.strokeStyle = edgeColor;
                 hoverCtx.lineWidth = Math.max(0.8, (e.displaySize || 1) / 2);
                 hoverCtx.beginPath();
-                if ((e.type || plotter.p.defaultEdgeType) === "curve") {
+                if (allowCurve && (e.type || plotter.p.defaultEdgeType) === "curve") {
                     hoverCtx.moveTo(sx, sy);
                     hoverCtx.quadraticCurveTo(
                         (sx + tx) / 2 + (ty - sy) / 4,
@@ -172,6 +196,20 @@
             }
 
             plotter.drawHoverNode(node);
+        }
+
+        function scheduleDragPreview(node) {
+            if (typeof window.requestAnimationFrame !== "function") {
+                drawDragPreview(node);
+                return;
+            }
+            if (pendingDragRaf !== null) return;
+            pendingDragRaf = window.requestAnimationFrame(function () {
+                pendingDragRaf = null;
+                if (dragState && dragState.dragged && dragState.node === node) {
+                    drawDragPreview(node);
+                }
+            });
         }
 
         // Capture phase on core.domRoot runs BEFORE mousecaptor on mouseDom
@@ -227,7 +265,7 @@
                     dragState.lastX = pos.x;
                     dragState.lastY = pos.y;
 
-                    drawDragPreview(dragState.node);
+                    scheduleDragPreview(dragState.node);
                 }
             },
             true
@@ -239,6 +277,11 @@
                 if (!dragState) return;
                 e.stopPropagation();
                 e.preventDefault();
+
+                if (pendingDragRaf !== null && typeof window.cancelAnimationFrame === "function") {
+                    window.cancelAnimationFrame(pendingDragRaf);
+                    pendingDragRaf = null;
+                }
 
                 var finished = dragState;
                 dragState = null;
