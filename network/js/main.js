@@ -43,6 +43,34 @@ Object.size = function(obj) {
     return size;
 };
 
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function formatNumberSpaces(val) {
+    if (val === null || val === undefined || val === "") return "";
+    var num = parseInt(String(val).replace(/\s+/g, ""), 10);
+    if (isNaN(num)) return escapeHtml(val);
+    return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function extractSpotifyArtistUrl(uriVal, fallbackId) {
+    var str = uriVal ? String(uriVal) : "";
+    var m = /artist:([A-Za-z0-9]+)/.exec(str);
+    if (m && m[1]) {
+        return "https://open.spotify.com/artist/" + m[1];
+    }
+    if (fallbackId && /^[A-Za-z0-9]{15,}$/.test(String(fallbackId))) {
+        return "https://open.spotify.com/artist/" + fallbackId;
+    }
+    return null;
+}
+
 function initSigma(config) {
 	var data=config.data
 	
@@ -90,17 +118,26 @@ function initSigma(config) {
 
     dataReady = function() {//This is called as soon as data is loaded
 		a.clusters = {};
+		a.clusterColors = {};
+		var groupAttr = null;
+		if (config.features && config.features.groupSelectorAttribute) {
+			groupAttr = typeof config.features.groupSelectorAttribute === "string"
+				? config.features.groupSelectorAttribute
+				: "modularity_class_name";
+		}
 
 		a.iterNodes(
 			function (b) { //This is where we populate the array used for the group select box
-
-				// note: index may not be consistent for all nodes. Should calculate each time. 
-				 // alert(JSON.stringify(b.attr.attributes[5].val));
-				// alert(b.x);
-				a.clusters[b.color] || (a.clusters[b.color] = []);
-				a.clusters[b.color].push(b.id);//SAH: push id not label
+				var attrs = b.attr && b.attr.attributes;
+				var groupKey = (groupAttr && attrs && attrs[groupAttr])
+					? String(attrs[groupAttr])
+					: b.color;
+				a.clusters[groupKey] || (a.clusters[groupKey] = []);
+				a.clusters[groupKey].push(b.id);//SAH: push id not label
+				if (!a.clusterColors[groupKey]) {
+					a.clusterColors[groupKey] = b.color || "#aaa";
+				}
 			}
-		
 		);
 	
 		a.bind("upnodes", function (a) {
@@ -199,6 +236,15 @@ function setupGUI(config) {
     $GP.cluster = new Cluster($GP.form.find("#attributeselect"));
     config.GP=$GP;
     initSigma(config);
+
+    $("#nodemode").find(".mode-btn").click(function () {
+        var mode = $(this).data("mode");
+        $("#nodemode .mode-btn").removeClass("active");
+        $(this).addClass("active");
+        if (sigInst && sigInst.setNodeColorMode) {
+            sigInst.setNodeColorMode(mode);
+        }
+    });
 }
 
 function configSigmaElements(config) {
@@ -275,10 +321,25 @@ function configSigmaElements(config) {
     }
     $GP.bg = $(sigInst._core.domElements.bg);
     $GP.bg2 = $(sigInst._core.domElements.bg2);
-    var a = [],
-        b,x=1;
-		for (b in sigInst.clusters) a.push('<div style="line-height:12px"><a href="#' + b + '"><div style="width:40px;height:12px;border:1px solid #fff;background:' + b + ';display:inline-block"></div> Group ' + (x++) + ' (' + sigInst.clusters[b].length + ' members)</a></div>');
-    //a.sort();
+    var a = [];
+    var clusterKeys = Object.keys(sigInst.clusters).sort(function (k1, k2) {
+        return sigInst.clusters[k2].length - sigInst.clusters[k1].length;
+    });
+    for (var ci = 0; ci < clusterKeys.length; ci++) {
+        var b = clusterKeys[ci];
+        var swatch = (sigInst.clusterColors && sigInst.clusterColors[b]) || b;
+        a.push(
+            '<div class="cluster-item"><a href="#" data-cluster="' +
+                escapeHtml(b) +
+                '"><span class="cluster-swatch" style="background:' +
+                escapeHtml(swatch) +
+                '"></span><span class="cluster-label">' +
+                escapeHtml(b) +
+                " (" +
+                sigInst.clusters[b].length +
+                ")</span></a></div>"
+        );
+    }
     $GP.cluster.content(a.join(""));
     b = {
         minWidth: 400,
@@ -402,9 +463,10 @@ function Cluster(a) {
     };
     this.content = function (a) {
         this.list.html(a);
-        this.list.find("a").click(function () {
-            var a = $(this).attr("href").substr(1);
-            showCluster(a)
+        this.list.find("a").click(function (e) {
+            e.preventDefault();
+            var clusterName = $(this).attr("data-cluster") || ($(this).attr("href") || "").substr(1);
+            showCluster(clusterName);
         })
     };
     this.hide = function () {
@@ -456,7 +518,7 @@ function nodeActive(a) {
    	   if (a==b.source) outgoing[b.target]=n;		//SAH
 	   else if (a==b.target) incoming[b.source]=n;		//SAH
        if (a == b.source || a == b.target) sigInst.neighbors[a == b.target ? b.source : b.target] = n;
-       b.hidden = !1, b.attr.color = "rgba(0, 0, 0, 1)";
+       b.hidden = !1;
     });
     var f = [];
     sigInst.iterNodes(function (a) {
@@ -528,14 +590,14 @@ function nodeActive(a) {
 
 	if (groupByDirection) {
 		size=Object.size(mutual);
-		f.push("<h2>Mututal (" + size + ")</h2>");
-		(size>0)? f=f.concat(createList(mutual)) : f.push("No mutual links<br>");
+		f.push("<h2>Kölcsönös (" + size + ")</h2>");
+		(size>0)? f=f.concat(createList(mutual)) : f.push("<span style='color:#94a3b8;font-size:12px'>Nincs kölcsönös kapcsolat</span><br>");
 		size=Object.size(incoming);
-		f.push("<h2>Incoming (" + size + ")</h2>");
-		(size>0)? f=f.concat(createList(incoming)) : f.push("No incoming links<br>");
+		f.push("<h2>Bejövő (" + size + ")</h2>");
+		(size>0)? f=f.concat(createList(incoming)) : f.push("<span style='color:#94a3b8;font-size:12px'>Nincs bejövő kapcsolat</span><br>");
 		size=Object.size(outgoing);
-		f.push("<h2>Outgoing (" + size + ")</h2>");
-		(size>0)? f=f.concat(createList(outgoing)) : f.push("No outgoing links<br>");
+		f.push("<h2>Kimenő (" + size + ")</h2>");
+		(size>0)? f=f.concat(createList(outgoing)) : f.push("<span style='color:#94a3b8;font-size:12px'>Nincs kimenő kapcsolat</span><br>");
 	} else {
 		f=f.concat(createList(sigInst.neighbors));
 	}
@@ -543,7 +605,7 @@ function nodeActive(a) {
     b.hidden = !1;
     b.attr.color = b.color;
     b.attr.lineWidth = 6;
-    b.attr.strokeStyle = "#000000";
+    b.attr.strokeStyle = "#ffffff";
     sigInst.draw(2, 2, 2, 2);
 
     $GP.info_link.find("ul").html(f.join(""));
@@ -552,36 +614,84 @@ function nodeActive(a) {
             b = a.attr("rel");
     });
     f = b.attr;
-    if (f.attributes) {
-  		var image_attribute = false;
-  		if (config.informationPanel.imageAttribute) {
-  			image_attribute=config.informationPanel.imageAttribute;
-  		}
-        e = [];
-        temp_array = [];
-        g = 0;
-        for (var attr in f.attributes) {
-            var d = f.attributes[attr],
-                h = "";
-			if (attr!=image_attribute) {
-                h = '<span><strong>' + attr + ':</strong> ' + d + '</span><br/>'
-			}
-            //temp_array.push(f.attributes[g].attr);
-            e.push(h)
-        }
+    var attrs = (f && f.attributes) ? f.attributes : {};
+    var image_attribute = (config.informationPanel && config.informationPanel.imageAttribute)
+        ? config.informationPanel.imageAttribute
+        : false;
+    var spotifyUrl = extractSpotifyArtistUrl(attrs.uri, b.id);
 
-        if (image_attribute && f.attributes[image_attribute]) {
-        	//image_index = jQuery.inArray(image_attribute, temp_array);
-        	var safeImgUrl = String(f.attributes[image_attribute]).replace(/"/g, "&quot;");
-        	$GP.info_name.html("<div><img src=\"" + safeImgUrl + "\" style=\"width:48px;height:48px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;\" /> <span onmouseover=\"sigInst._core.plotter.drawHoverNode(sigInst._core.graph.nodesIndex['" + b.id + '\'])" onmouseout="sigInst.refresh()">' + b.label + "</span></div>");
-        } else {
-        	$GP.info_name.html("<div><span onmouseover=\"sigInst._core.plotter.drawHoverNode(sigInst._core.graph.nodesIndex['" + b.id + '\'])" onmouseout="sigInst.refresh()">' + b.label + "</span></div>");
-        }
-        // Image field for attribute pane
-        $GP.info_data.html(e.join("<br/>"))
+    var headerHtml = '<div class="artist-pane-header">';
+    if (image_attribute && attrs[image_attribute]) {
+        var safeImgUrl = String(attrs[image_attribute]).replace(/"/g, "&quot;");
+        headerHtml += '<img class="artist-pane-avatar" src="' + safeImgUrl + '" alt="" style="border-color:' + escapeHtml(b.color || "#ffffff") + '" />';
     }
+    headerHtml += '<div class="artist-pane-title"><span onmouseover="sigInst._core.plotter.drawHoverNode(sigInst._core.graph.nodesIndex[\'' + b.id + '\'])" onmouseout="sigInst.refresh()">' + escapeHtml(b.label) + '</span></div>';
+    if (spotifyUrl) {
+        headerHtml += '<a class="spotify-btn" href="' + escapeHtml(spotifyUrl) + '" target="_blank" rel="noopener noreferrer">Megnyitás Spotify-on &#8599;</a>';
+    }
+    headerHtml += '</div>';
+    $GP.info_name.html(headerHtml);
+
+    var cards = [];
+    if (attrs.modularity_class_name) {
+        cards.push(
+            '<div class="attr-card">' +
+                '<div class="attr-label">Klaszter</div>' +
+                '<div class="attr-value"><span class="attr-dot" style="background:' + escapeHtml(b.color || "#aaa") + '"></span><span>' + escapeHtml(attrs.modularity_class_name) + '</span></div>' +
+            '</div>'
+        );
+    }
+    if (attrs.monthly_listeners !== undefined && attrs.monthly_listeners !== null && attrs.monthly_listeners !== "") {
+        cards.push(
+            '<div class="attr-card">' +
+                '<div class="attr-label">Havi hallgatottsági adatok (2026-11-25)</div>' +
+                '<div class="attr-value">' + formatNumberSpaces(attrs.monthly_listeners) + '</div>' +
+            '</div>'
+        );
+    }
+    if (attrs.in_degree !== undefined && attrs.in_degree !== null && attrs.in_degree !== "") {
+        cards.push(
+            '<div class="attr-card">' +
+                '<div class="attr-label">Befelé jövő élek</div>' +
+                '<div class="attr-value">' + formatNumberSpaces(attrs.in_degree) + '</div>' +
+            '</div>'
+        );
+    }
+    if (spotifyUrl) {
+        cards.push(
+            '<div class="attr-card">' +
+                '<div class="attr-label">Spotify oldal</div>' +
+                '<div class="attr-value"><a class="attr-link" href="' + escapeHtml(spotifyUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(spotifyUrl) + '</a></div>' +
+            '</div>'
+        );
+    }
+
+    var hiddenKeys = {
+        image: true,
+        uri: true,
+        modularity_class_name: true,
+        monthly_listeners: true,
+        in_degree: true
+    };
+    if (image_attribute) hiddenKeys[image_attribute] = true;
+
+    var extras = [];
+    for (var attrKey in attrs) {
+        if (!Object.prototype.hasOwnProperty.call(attrs, attrKey) || hiddenKeys[attrKey]) continue;
+        extras.push('<div><strong>' + escapeHtml(attrKey) + ':</strong> ' + escapeHtml(attrs[attrKey]) + '</div>');
+    }
+    if (extras.length > 0) {
+        cards.push(
+            '<details class="extra-metrics">' +
+                '<summary>További hálózati adatok (' + extras.length + ')</summary>' +
+                '<div class="extra-metrics-body">' + extras.join("") + '</div>' +
+            '</details>'
+        );
+    }
+
+    $GP.info_data.html(cards.join(""));
     $GP.info_data.show();
-    $GP.info_p.html("Connections:");
+    $GP.info_p.html("Kapcsolatok:");
     $GP.info.animate({width:'show'},350);
 	$GP.info_donnees.hide();
 	$GP.info_donnees.show();
@@ -609,9 +719,10 @@ function showCluster(a) {
         }
         sigInst.clusters[a] = e;
         sigInst.draw(2, 2, 2, 2);
-        $GP.info_name.html("<b>" + a + "</b>");
+        var clusterSwatch = (sigInst.clusterColors && sigInst.clusterColors[a]) || "#aaa";
+        $GP.info_name.html('<div class="attr-value" style="font-size:16px"><span class="attr-dot" style="background:' + escapeHtml(clusterSwatch) + '"></span><b>' + escapeHtml(a) + '</b></div>');
         $GP.info_data.hide();
-        $GP.info_p.html("Group Members:");
+        $GP.info_p.html("Klaszter tagjai (" + e.length + "):");
         $GP.info_link.find("ul").html(f.join(""));
         $GP.info.animate({width:'show'},350);
         $GP.search.clean();

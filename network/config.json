@@ -4,26 +4,26 @@
   "data": "data.json",
   "logo": {
     "file": "",
-    "link": "",
-    "text": "Imre Kovacs"
+    "link": "https://kovacsimi.github.io/",
+    "text": "Imre Kovács"
   },
   "text": {
-    "more": "Spotify móricka project",
-    "intro": "Spotify móricka project",
-    "title": ""
+    "more": "Magyar előadók kapcsolati hálója a felhasználói hallgatottsági adatok alapján",
+    "intro": "Magyar előadók kapcsolati hálója a felhasználói hallgatottsági adatok alapján",
+    "title": "Spotify Hallgatottsági adatok és hasonlóság"
   },
   "legend": {
-    "edgeLabel": "Fans also like",
-    "colorLabel": "Modularity",
+    "edgeLabel": "Based on \"Fans also like\" recommendation",
+    "colorLabel": "Modularity class",
     "nodeLabel": "Artists"
   },
   "features": {
     "search": true,
-    "groupSelectorAttribute": false,
+    "groupSelectorAttribute": "modularity_class_name",
     "hoverBehavior": "default"
   },
   "informationPanel": {
-    "groupByEdgeDirection": false,
+    "groupByEdgeDirection": true,
     "imageAttribute": "image"
   },
   "sigma": {
@@ -32,7 +32,7 @@
       "defaultHoverLabelBGColor": "#002147",
       "defaultLabelBGColor": "#ddd",
       "activeFontStyle": "bold",
-      "defaultLabelColor": "#000",
+      "defaultLabelColor": "#ffffff",
       "labelThreshold": 10,
       "defaultLabelHoverColor": "#fff",
       "fontStyle": "bold",
@@ -40,8 +40,8 @@
       "defaultLabelSize": 14
     },
     "graphProperties": {
-      "maxEdgeSize": 0.5,
-      "minEdgeSize": 0.2,
+      "maxEdgeSize": 2.5,
+      "minEdgeSize": 0.75,
       "minNodeSize": 2,
       "maxNodeSize": 20
     },

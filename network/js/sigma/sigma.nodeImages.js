@@ -24,6 +24,7 @@
         var nodeCtx = nodeDom.getContext("2d");
         var hoverCtx = core.domElements.hover.getContext("2d");
         var redrawTimer = null;
+        var colorMode = "image"; // "image" | "color"
 
         function scheduleNodeLayerRedraw() {
             if (redrawTimer !== null) return;
@@ -36,6 +37,27 @@
                 core.refresh();
             }, 120);
         }
+
+        function redrawNodesNow() {
+            if (!core.p || !core.p.lastNodes) return;
+            nodeCtx.clearRect(0, 0, nodeDom.width, nodeDom.height);
+            plotter.currentNodeIndex = 0;
+            while (plotter.task_drawNode()) {}
+            core.refresh();
+        }
+
+        core._nodeImageMode = {
+            setMode: function (mode) {
+                var next = mode === "color" ? "color" : "image";
+                if (colorMode !== next) {
+                    colorMode = next;
+                    redrawNodesNow();
+                }
+            },
+            getMode: function () {
+                return colorMode;
+            },
+        };
 
         function pumpQueue() {
             while (activeLoads < MAX_CONCURRENT_LOADS && loadQueue.length > 0) {
@@ -91,8 +113,8 @@
             borderWidth
         ) {
             var isDimmed = !!(node.attr && node.attr.grey);
-            var url = getNodeImageUrl(node);
-            var img = r >= MIN_IMAGE_RADIUS ? requestImage(url) : null;
+            var url = colorMode === "image" ? getNodeImageUrl(node) : null;
+            var img = colorMode === "image" && r >= MIN_IMAGE_RADIUS ? requestImage(url) : null;
 
             ctx.save();
             if (isDimmed) {
@@ -153,7 +175,7 @@
                 var r = Math.max(1, Math.round(10 * node.displaySize) / 10);
                 var color = node.color || plotter.p.defaultNodeColor;
                 var lineWidth = node.attr && node.attr.lineWidth ? node.attr.lineWidth : 0;
-                var strokeStyle = (node.attr && node.attr.strokeStyle) || "#000";
+                var strokeStyle = (node.attr && node.attr.strokeStyle) || "#ffffff";
 
                 drawCircularImageOrFallback(
                     nodeCtx,
@@ -340,10 +362,17 @@
     }
 
     sigma.addPlugin(
-        "nodeImages",
-        function () {
+        "setNodeColorMode",
+        function (mode) {
+            if (this._core._nodeImageMode) {
+                this._core._nodeImageMode.setMode(mode);
+            }
             return this;
         },
         attachNodeImagePlugin
     );
+
+    sigma.publicPrototype.getNodeColorMode = function () {
+        return this._core._nodeImageMode ? this._core._nodeImageMode.getMode() : "image";
+    };
 })();
