@@ -644,7 +644,7 @@ function nodeActive(a) {
     if (attrs.monthly_listeners !== undefined && attrs.monthly_listeners !== null && attrs.monthly_listeners !== "") {
         cards.push(
             '<div class="attr-card">' +
-                '<div class="attr-label">Havi hallgatottsági adatok (2026-11-25)</div>' +
+                '<div class="attr-label">Havi hallgatottsági adatok<br>(2026-11-25)</div>' +
                 '<div class="attr-value">' + formatNumberSpaces(attrs.monthly_listeners) + '</div>' +
             '</div>'
         );

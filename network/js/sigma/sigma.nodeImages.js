@@ -22,6 +22,8 @@
         var graph = core.graph;
         var nodeDom = core.domElements.nodes;
         var nodeCtx = nodeDom.getContext("2d");
+        var labelDom = core.domElements.labels;
+        var labelCtx = labelDom ? labelDom.getContext("2d") : null;
         var hoverCtx = core.domElements.hover.getContext("2d");
         var redrawTimer = null;
         var colorMode = "image"; // "image" | "color"
@@ -135,30 +137,27 @@
                 var dh = ih * scale;
                 ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
                 ctx.restore();
-
-                ctx.beginPath();
-                ctx.arc(x, y, r, 0, 2 * Math.PI, true);
-                if (borderWidth > 0) {
-                    ctx.strokeStyle = borderColor;
-                    ctx.lineWidth = borderWidth;
-                } else {
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
-                    ctx.lineWidth = Math.max(0.6, Math.min(1.5, r * 0.08));
-                }
-                ctx.stroke();
             } else {
                 ctx.fillStyle = fallbackColor;
                 ctx.beginPath();
                 ctx.arc(x, y, r, 0, 2 * Math.PI, true);
                 ctx.closePath();
                 ctx.fill();
-
-                if (borderWidth > 0) {
-                    ctx.strokeStyle = borderColor;
-                    ctx.lineWidth = borderWidth;
-                    ctx.stroke();
-                }
             }
+
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, 2 * Math.PI, true);
+            if (borderWidth > 0) {
+                ctx.strokeStyle = borderColor;
+                ctx.lineWidth = borderWidth;
+            } else if (colorMode === "color") {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.82)";
+                ctx.lineWidth = Math.max(0.8, Math.min(1.6, r * 0.1));
+            } else {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+                ctx.lineWidth = Math.max(0.6, Math.min(1.5, r * 0.08));
+            }
+            ctx.stroke();
 
             ctx.restore();
         }
@@ -196,47 +195,117 @@
             return plotter.currentNodeIndex < len;
         };
 
-        plotter.drawHoverNode = function (node) {
+        function getLabelSize(node) {
+            return plotter.p.labelSize === "fixed"
+                ? plotter.p.defaultLabelSize
+                : plotter.p.labelSizeRatio * node.displaySize;
+        }
+
+        function buildFontString(fontStyle, fontFamily, sizePx) {
+            var parts = [];
+            if (fontStyle) parts.push(String(fontStyle).trim());
+            parts.push(sizePx + "px");
+            parts.push(fontFamily || "Arial");
+            return parts.join(" ");
+        }
+
+        function getLabelOffsetX(node) {
+            return Math.max(node.displaySize + 6, 1.5 * node.displaySize);
+        }
+
+        // Override Sigma v0.1's label drawer to insert a space after fontStyle
+        // (fixing the browser fallback to 10px) and keep alignment consistent with hover pills.
+        if (labelCtx) {
+            plotter.task_drawLabel = function () {
+                var nodes = graph.nodes;
+                var len = nodes.length;
+                var count = 0;
+
+                while (count++ < plotter.p.labelsSpeed && plotter.currentLabelIndex < len) {
+                    var node = nodes[plotter.currentLabelIndex++];
+                    if (!plotter.isOnScreen(node)) continue;
+
+                    if (node.displaySize >= plotter.p.labelThreshold || node.forceLabel) {
+                        var labelSize = getLabelSize(node);
+                        var isDimmed = !!(node.attr && node.attr.grey);
+                        var textX = Math.round(node.displayX + getLabelOffsetX(node));
+                        var textY = Math.round(node.displayY);
+
+                        labelCtx.save();
+                        if (isDimmed) {
+                            labelCtx.globalAlpha = 0.2;
+                        }
+                        labelCtx.font = buildFontString(
+                            plotter.p.fontStyle,
+                            plotter.p.font || "Arial",
+                            labelSize
+                        );
+                        labelCtx.textBaseline = "middle";
+                        labelCtx.lineJoin = "round";
+                        labelCtx.lineWidth = Math.max(3, Math.round(labelSize * 0.2));
+                        labelCtx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+                        labelCtx.strokeText(node.label, textX, textY);
+                        labelCtx.fillStyle =
+                            plotter.p.labelColor === "node"
+                                ? node.color || plotter.p.defaultNodeColor
+                                : plotter.p.defaultLabelColor;
+                        labelCtx.fillText(node.label, textX, textY);
+                        labelCtx.restore();
+                    }
+                }
+
+                return plotter.currentLabelIndex < len;
+            };
+        }
+
+        function drawHighlightedNode(node, isActive) {
             if (!plotter.isOnScreen(node)) return plotter;
 
-            var labelSize =
-                plotter.p.labelSize === "fixed"
-                    ? plotter.p.defaultLabelSize
-                    : plotter.p.labelSizeRatio * node.displaySize;
+            var labelSize = getLabelSize(node);
+            var fontStyle = isActive
+                ? plotter.p.activeFontStyle || plotter.p.fontStyle || ""
+                : plotter.p.hoverFontStyle || plotter.p.fontStyle || "";
+            var fontFamily = isActive
+                ? plotter.p.activeFont || plotter.p.font || ""
+                : plotter.p.hoverFont || plotter.p.font || "";
+            var bgMode = isActive ? plotter.p.labelActiveBGColor : plotter.p.labelHoverBGColor;
+            var defaultBG = isActive
+                ? plotter.p.defaultActiveLabelBGColor
+                : plotter.p.defaultHoverLabelBGColor;
+            var hasShadow = isActive ? plotter.p.labelActiveShadow : plotter.p.labelHoverShadow;
+            var shadowColor = isActive
+                ? plotter.p.labelActiveShadowColor
+                : plotter.p.labelHoverShadowColor;
+            var nodeMode = isActive ? plotter.p.nodeActiveColor : plotter.p.nodeHoverColor;
+            var defaultNodeClr = isActive
+                ? plotter.p.defaultNodeActiveColor
+                : plotter.p.defaultNodeHoverColor;
+            var textMode = isActive ? plotter.p.labelActiveColor : plotter.p.labelHoverColor;
+            var defaultTextClr = isActive
+                ? plotter.p.defaultLabelActiveColor
+                : plotter.p.defaultLabelHoverColor;
 
-            hoverCtx.font =
-                (plotter.p.hoverFontStyle || plotter.p.fontStyle || "") +
-                " " +
-                labelSize +
-                "px " +
-                (plotter.p.hoverFont || plotter.p.font || "");
+            hoverCtx.save();
+            hoverCtx.font = buildFontString(fontStyle, fontFamily, labelSize);
+
+            var textX = Math.round(node.displayX + getLabelOffsetX(node));
+            var padY = 4;
+            var pillX = Math.round(node.displayX - labelSize / 2 - padY);
+            var pillY = Math.round(node.displayY - labelSize / 2 - padY);
+            var pillH = Math.round(labelSize + padY * 2);
+            var pillW = Math.round(textX - pillX + hoverCtx.measureText(node.label).width + 10);
+            var pillR = Math.round(labelSize / 2 + padY);
 
             hoverCtx.fillStyle =
-                plotter.p.labelHoverBGColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultHoverLabelBGColor;
-
+                bgMode === "node" ? node.color || plotter.p.defaultNodeColor : defaultBG;
             hoverCtx.beginPath();
-            if (plotter.p.labelHoverShadow) {
+            if (hasShadow) {
                 hoverCtx.shadowOffsetX = 0;
                 hoverCtx.shadowOffsetY = 0;
                 hoverCtx.shadowBlur = 4;
-                hoverCtx.shadowColor = plotter.p.labelHoverShadowColor;
+                hoverCtx.shadowColor = shadowColor;
             }
-            sigma.tools.drawRoundRect(
-                hoverCtx,
-                Math.round(node.displayX - labelSize / 2 - 2),
-                Math.round(node.displayY - labelSize / 2 - 2),
-                Math.round(
-                    hoverCtx.measureText(node.label).width +
-                        1.5 * node.displaySize +
-                        labelSize / 2 +
-                        4
-                ),
-                Math.round(labelSize + 4),
-                Math.round(labelSize / 2 + 2),
-                "left"
-            );
+            sigma.tools.drawRoundRect(hoverCtx, pillX, pillY, pillW, pillH, pillR, "left");
             hoverCtx.closePath();
             hoverCtx.fill();
 
@@ -249,10 +318,8 @@
                 plotter.p.nodeBorderColor === "node"
                     ? node.color || plotter.p.defaultNodeColor
                     : plotter.p.defaultNodeBorderColor;
-            var hoverColor =
-                plotter.p.nodeHoverColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultNodeHoverColor;
+            var nodeFillColor =
+                nodeMode === "node" ? node.color || plotter.p.defaultNodeColor : defaultNodeClr;
 
             drawCircularImageOrFallback(
                 hoverCtx,
@@ -260,104 +327,26 @@
                 Math.round(node.displayX),
                 Math.round(node.displayY),
                 r,
-                hoverColor,
+                nodeFillColor,
                 borderColor,
-                Math.max(1.5, plotter.p.borderSize || 1.5)
+                Math.max(isActive ? 2 : 1.5, plotter.p.borderSize || (isActive ? 2 : 1.5))
             );
 
             hoverCtx.fillStyle =
-                plotter.p.labelHoverColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultLabelHoverColor;
-            hoverCtx.fillText(
-                node.label,
-                Math.round(node.displayX + 1.5 * node.displaySize),
-                Math.round(node.displayY + labelSize / 2 - 3)
-            );
+                textMode === "node" ? node.color || plotter.p.defaultNodeColor : defaultTextClr;
+            hoverCtx.textBaseline = "middle";
+            hoverCtx.fillText(node.label, textX, Math.round(node.displayY + 1));
+            hoverCtx.restore();
 
             return plotter;
+        }
+
+        plotter.drawHoverNode = function (node) {
+            return drawHighlightedNode(node, false);
         };
 
         plotter.drawActiveNode = function (node) {
-            if (!plotter.isOnScreen(node)) return plotter;
-
-            var labelSize =
-                plotter.p.labelSize === "fixed"
-                    ? plotter.p.defaultLabelSize
-                    : plotter.p.labelSizeRatio * node.displaySize;
-
-            hoverCtx.font =
-                (plotter.p.activeFontStyle || plotter.p.fontStyle || "") +
-                " " +
-                labelSize +
-                "px " +
-                (plotter.p.activeFont || plotter.p.font || "");
-
-            hoverCtx.fillStyle =
-                plotter.p.labelActiveBGColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultActiveLabelBGColor;
-
-            hoverCtx.beginPath();
-            if (plotter.p.labelActiveShadow) {
-                hoverCtx.shadowOffsetX = 0;
-                hoverCtx.shadowOffsetY = 0;
-                hoverCtx.shadowBlur = 4;
-                hoverCtx.shadowColor = plotter.p.labelActiveShadowColor;
-            }
-            sigma.tools.drawRoundRect(
-                hoverCtx,
-                Math.round(node.displayX - labelSize / 2 - 2),
-                Math.round(node.displayY - labelSize / 2 - 2),
-                Math.round(
-                    hoverCtx.measureText(node.label).width +
-                        1.5 * node.displaySize +
-                        labelSize / 2 +
-                        4
-                ),
-                Math.round(labelSize + 4),
-                Math.round(labelSize / 2 + 2),
-                "left"
-            );
-            hoverCtx.closePath();
-            hoverCtx.fill();
-
-            hoverCtx.shadowOffsetX = 0;
-            hoverCtx.shadowOffsetY = 0;
-            hoverCtx.shadowBlur = 0;
-
-            var r = Math.max(1, node.displaySize);
-            var borderColor =
-                plotter.p.nodeBorderColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultNodeBorderColor;
-            var activeColor =
-                plotter.p.nodeActiveColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultNodeActiveColor;
-
-            drawCircularImageOrFallback(
-                hoverCtx,
-                node,
-                Math.round(node.displayX),
-                Math.round(node.displayY),
-                r,
-                activeColor,
-                borderColor,
-                Math.max(2, plotter.p.borderSize || 2)
-            );
-
-            hoverCtx.fillStyle =
-                plotter.p.labelActiveColor === "node"
-                    ? node.color || plotter.p.defaultNodeColor
-                    : plotter.p.defaultLabelActiveColor;
-            hoverCtx.fillText(
-                node.label,
-                Math.round(node.displayX + 1.5 * node.displaySize),
-                Math.round(node.displayY + labelSize / 2 - 3)
-            );
-
-            return plotter;
+            return drawHighlightedNode(node, true);
         };
     }
 

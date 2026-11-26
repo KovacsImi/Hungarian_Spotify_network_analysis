@@ -204,6 +204,7 @@ canvas#sigma_bg_1 {
 #attributepane .attr-label {
 	font-size: 10px;
 	font-weight: 700;
+	line-height: 1.35;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	color: #94a3b8;
